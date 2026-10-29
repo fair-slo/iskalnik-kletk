@@ -10,7 +10,7 @@
   var CONFIG = {
     // mapa s podatki (samodejno: ista mapa kot ta datoteka)
     base: SCRIPT ? SCRIPT.replace(/[^\/]*$/, '') : '',
-    version: '202610290651',
+    version: '202610290906',
     // Ecwid ID kategorije, kjer se iskalnik prikaže samodejno, če element #f4u-kletke ni najden
     categoryIds: [208535776],
     photoBase: 'https://hubo.alpuna.de/modules/gallery/galleries/',
@@ -87,12 +87,17 @@
     var SKEY = 'f4u-kletke-izbira';
     function saveSel(box) {
       try {
-        var o = { b: state.brand ? state.brand.n : '', m: state.model ? state.model[0] : '', v: state.variant ? state.variant[0] : '', box: box || '' };
+        var o = { b: state.brand ? state.brand.n : '', m: state.model ? state.model[0] : '', v: state.variant ? state.variant[0] : '', box: box || '', t: Date.now() };
         sessionStorage.setItem(SKEY, JSON.stringify(o));
       } catch (e) {}
     }
+    // izbiro obnovimo samo, ko se kupec z gumbom Nazaj vrne s strani kletke, ki jo je odprl iz iskalnika
     var pending = null;
-    try { pending = JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) { pending = null; }
+    try {
+      pending = JSON.parse(sessionStorage.getItem(SKEY) || 'null');
+      sessionStorage.removeItem(SKEY);
+    } catch (e) { pending = null; }
+    if (pending && (!pending.box || !pending.t || Date.now() - pending.t > 3 * 3600 * 1000 || !cameBack())) pending = null;
 
     function showMsg(t) { msg.textContent = t || ''; msg.hidden = !t; }
 
@@ -119,7 +124,7 @@
       state.model = null; state.variant = null; BRANDDATA = null;
       selM.disabled = true;
       selM.innerHTML = '<option value="">' + (state.brand ? 'Nalaganje …' : 'Najprej izberite znamko') + '</option>';
-      renderCars(); renderResult(); saveSel();
+      renderCars(); renderResult();
       if (!state.brand) return;
       var b = state.brand;
       getJSON('data/' + b.f + '.json').then(function (d) {
@@ -152,13 +157,13 @@
       state.model = selM.value === '' ? null : state.brand.m[+selM.value];
       state.variant = null;
       if (state.model && state.model[1].length === 1) state.variant = state.model[1][0];
-      renderCars(); renderResult(); saveSel();
+      renderCars(); renderResult();
     });
     cars.addEventListener('click', function (e) {
       var c = e.target.closest('[data-key]'); if (!c) return;
       var k = c.getAttribute('data-key');
       state.variant = state.model[1].filter(function (v) { return v[0] === k; })[0] || null;
-      renderCars(); renderResult(true); saveSel();
+      renderCars(); renderResult(true);
     });
 
     // ---- galerija (lightbox) ----
@@ -286,6 +291,16 @@
       result.innerHTML = h; result.hidden = false;
       if (scroll && result.scrollIntoView) { try { result.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
     }
+  }
+
+  /* ====== Zaznava vrnitve z gumbom Nazaj ====== */
+  var lastPop = 0;
+  window.addEventListener('popstate', function () { lastPop = Date.now(); });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) lastPop = Date.now(); });
+  function cameBack() {
+    if (Date.now() - lastPop < 15000) return true;
+    try { var nv = performance.getEntriesByType('navigation')[0]; if (nv && nv.type === 'back_forward' && performance.now() < 30000) return true; } catch (e) {}
+    return false;
   }
 
   /* ====== Vstavljanje v stran (deluje tudi pri Ecwidovem menjavanju strani brez ponovnega nalaganja) ====== */
