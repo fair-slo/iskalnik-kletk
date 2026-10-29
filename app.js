@@ -10,7 +10,7 @@
   var CONFIG = {
     // mapa s podatki (samodejno: ista mapa kot ta datoteka)
     base: SCRIPT ? SCRIPT.replace(/[^\/]*$/, '') : '',
-    version: '202610290906',
+    version: '202610290908',
     // Ecwid ID kategorije, kjer se iskalnik prikaže samodejno, če element #f4u-kletke ni najden
     categoryIds: [208535776],
     photoBase: 'https://hubo.alpuna.de/modules/gallery/galleries/',
@@ -95,7 +95,6 @@
     var pending = null;
     try {
       pending = JSON.parse(sessionStorage.getItem(SKEY) || 'null');
-      sessionStorage.removeItem(SKEY);
     } catch (e) { pending = null; }
     if (pending && (!pending.box || !pending.t || Date.now() - pending.t > 3 * 3600 * 1000 || !cameBack())) pending = null;
 
