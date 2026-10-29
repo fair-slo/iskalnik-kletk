@@ -10,7 +10,7 @@
   var CONFIG = {
     // mapa s podatki (samodejno: ista mapa kot ta datoteka)
     base: SCRIPT ? SCRIPT.replace(/[^\/]*$/, '') : '',
-    version: '202610290611',
+    version: '202610290651',
     // Ecwid ID kategorije, kjer se iskalnik prikaže samodejno, če element #f4u-kletke ni najden
     categoryIds: [208535776],
     photoBase: 'https://hubo.alpuna.de/modules/gallery/galleries/',
@@ -83,6 +83,17 @@
     var q = function (r) { return root.querySelector('[data-r="' + r + '"]'); };
     var selB = q('brand'), selM = q('model'), cars = q('cars'), vstep = q('vstep'), result = q('result'), lb = q('lb'), msg = q('msg');
 
+    // zapomni si izbiro, da ostane po vrnitvi s strani izdelka (gumb Nazaj)
+    var SKEY = 'f4u-kletke-izbira';
+    function saveSel(box) {
+      try {
+        var o = { b: state.brand ? state.brand.n : '', m: state.model ? state.model[0] : '', v: state.variant ? state.variant[0] : '', box: box || '' };
+        sessionStorage.setItem(SKEY, JSON.stringify(o));
+      } catch (e) {}
+    }
+    var pending = null;
+    try { pending = JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) { pending = null; }
+
     function showMsg(t) { msg.textContent = t || ''; msg.hidden = !t; }
 
     function loadIndex() {
@@ -91,6 +102,10 @@
         INDEX = r[0]; PRODUCTS = r[1] || {};
         selB.innerHTML = '<option value="">Izberite znamko</option>' + INDEX.b.map(function (b, i) { return '<option value="' + i + '">' + esc(b.n) + '</option>'; }).join('');
         selB.disabled = false;
+        if (pending && pending.b) {
+          var bi = -1; INDEX.b.forEach(function (b, i) { if (b.n === pending.b) bi = i; });
+          if (bi >= 0) { selB.value = String(bi); selB.dispatchEvent(new Event('change')); } else pending = null;
+        }
       }).catch(function () {
         selB.innerHTML = '<option value="">Podatkov ni bilo mogoče naložiti</option>';
         showMsg('Podatkov trenutno ni bilo mogoče naložiti. Osvežite stran ali poskusite znova čez nekaj trenutkov.');
@@ -104,7 +119,7 @@
       state.model = null; state.variant = null; BRANDDATA = null;
       selM.disabled = true;
       selM.innerHTML = '<option value="">' + (state.brand ? 'Nalaganje …' : 'Najprej izberite znamko') + '</option>';
-      renderCars(); renderResult();
+      renderCars(); renderResult(); saveSel();
       if (!state.brand) return;
       var b = state.brand;
       getJSON('data/' + b.f + '.json').then(function (d) {
@@ -112,6 +127,19 @@
         BRANDDATA = d;
         selM.innerHTML = '<option value="">Izberite model</option>' + b.m.map(function (m, i) { return '<option value="' + i + '">' + esc(m[0]) + '</option>'; }).join('');
         selM.disabled = false;
+        var p = pending; pending = null;
+        if (p && p.b === b.n && p.m) {
+          var mi = -1; b.m.forEach(function (m, i) { if (m[0] === p.m) mi = i; });
+          if (mi >= 0) {
+            selM.value = String(mi);
+            state.model = b.m[mi];
+            state.variant = state.model[1].filter(function (v) { return v[0] === p.v; })[0] || (state.model[1].length === 1 ? state.model[1][0] : null);
+            renderCars(); renderResult();
+            var t = (p.box && root.querySelector('.f4u-boxes [data-box="' + p.box + '"]')) || (state.variant && result);
+            if (t && t.scrollIntoView) { try { t.scrollIntoView({ block: p.box ? 'center' : 'start' }); } catch (e) {} }
+            return;
+          }
+        }
         if (b.m.length === 1) { selM.value = '0'; selM.dispatchEvent(new Event('change')); }
       }).catch(function () {
         if (state.brand !== b) return;
@@ -124,13 +152,13 @@
       state.model = selM.value === '' ? null : state.brand.m[+selM.value];
       state.variant = null;
       if (state.model && state.model[1].length === 1) state.variant = state.model[1][0];
-      renderCars(); renderResult();
+      renderCars(); renderResult(); saveSel();
     });
     cars.addEventListener('click', function (e) {
       var c = e.target.closest('[data-key]'); if (!c) return;
       var k = c.getAttribute('data-key');
       state.variant = state.model[1].filter(function (v) { return v[0] === k; })[0] || null;
-      renderCars(); renderResult(true);
+      renderCars(); renderResult(true); saveSel();
     });
 
     // ---- galerija (lightbox) ----
@@ -147,6 +175,8 @@
     lb.addEventListener('touchend', function (e) { if (touchX === null) return; var dx = e.changedTouches[0].clientX - touchX; if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1); touchX = null; });
 
     root.addEventListener('click', function (e) {
+      var bt = e.target.closest('.f4u-btn');
+      if (bt) { var bx = bt.closest('[data-box]'); saveSel(bx ? bx.getAttribute('data-box') : ''); }
       var g = e.target.closest('[data-goto]');
       if (g) { var t = root.querySelector('.f4u-boxes [data-box="' + g.getAttribute('data-goto') + '"]'); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('is-flash'); setTimeout(function () { t.classList.remove('is-flash'); }, 1600); } return; }
       if (e.target.closest('.f4u-lb-nav')) { step(e.target.closest('.is-prev') ? -1 : 1); return; }
