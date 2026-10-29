@@ -10,7 +10,7 @@
   var CONFIG = {
     // mapa s podatki (samodejno: ista mapa kot ta datoteka)
     base: SCRIPT ? SCRIPT.replace(/[^\/]*$/, '') : '',
-    version: '202610290908',
+    version: '202610290922',
     // Ecwid ID kategorije, kjer se iskalnik prikaže samodejno, če element #f4u-kletke ni najden
     categoryIds: [208535776],
     photoBase: 'https://hubo.alpuna.de/modules/gallery/galleries/',
@@ -307,13 +307,15 @@
     var m = location.href.match(/-c(\d+)(?:[/?#]|$)/); return m ? +m[1] : null;
   }
   function tryMount() {
+    // kategorijo vedno beremo iz trenutnega naslova – Ecwid ob prehodu med kategorijami še nekaj trenutkov kaže staro stran
+    var cid = currentCategoryId() || (/\/products(\/|$)/.test(location.pathname) ? null : window.__F4U_CAT);
+    var ours = cid && CONFIG.categoryIds.indexOf(cid) !== -1;
+    var auto = document.querySelectorAll('[data-f4u-auto]');
+    if (!ours) { for (var i = 0; i < auto.length; i++) auto[i].parentNode.removeChild(auto[i]); return; }
     var el = document.getElementById('f4u-kletke') || document.querySelector('.f4u-kletke,[data-f4u-kletke]');
     if (!el) {
-      var cid = window.__F4U_CAT || currentCategoryId();
-      if (cid && CONFIG.categoryIds.indexOf(cid) !== -1) {
-        var host = document.querySelector('.grid__description') || document.querySelector('.ec-store .grid__wrap') || document.querySelector('.ec-store');
-        if (host) { el = document.createElement('div'); el.id = 'f4u-kletke'; if (host.classList.contains('grid__description')) host.appendChild(el); else host.parentNode.insertBefore(el, host); }
-      }
+      var host = document.querySelector('.grid__description') || document.querySelector('.ec-store .grid__wrap') || document.querySelector('.ec-store');
+      if (host) { el = document.createElement('div'); el.id = 'f4u-kletke'; el.setAttribute('data-f4u-auto', '1'); if (host.classList.contains('grid__description')) host.appendChild(el); else host.parentNode.insertBefore(el, host); }
     }
     if (el) mount(el);
   }
